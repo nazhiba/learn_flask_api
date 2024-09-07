@@ -199,6 +199,10 @@ def satu_buku(id):
 ### fungsinya apa?
 #### besok lagi males ngetik
 
+## SQLITE Database
+
+
+
 
 
 

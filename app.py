@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import sqlite3
 
 aplikasi = Flask(__name__)
 
@@ -33,38 +34,57 @@ list_buku = [
      }
 ]
 
+def koneksi_php():
+     koneksi = None
+     try:
+          koneksi = sqlite3.connect('buku.sqlite')
+     except sqlite3.Error as e:
+          print(e)
+     return koneksi
+
+
 @aplikasi.route('/books', methods=['GET','POST'])
 def books():
+     koneksi = koneksi_php()
+     kursor = koneksi.cursor()
+
      if request.method == "GET":
-          if (len(list_buku)) > 0:
-               return jsonify(list_buku)
-          else:
-               return "Tidak ditemukan", 404
+          kursor = koneksi.execute("SELECT * FROM book")
+          buku = [
+               dict(id=row[0], penulis=row[1], bahasa=row[2], judul=row[3], deskripsi=row[4])
+               for row in kursor.fetchall()
+          ]
+          if buku is not None:
+               return jsonify(buku)
+
      elif request.method == "POST":
           new_penulis = request.form["penulis"]
           new_bahasa = request.form["bahasa"]
           new_judul = request.form["judul"]
           new_deskripsi = request.form["deskripsi"]
-          ID = list_buku[-1]['id']+1
+          
+          sql_permintaan = """INSERT INTO book (penulis, bahasa, judul, deskripsi)
+                              VALUES (? ,? ,?, ?)"""
+          kursor = kursor.execute(sql_permintaan, (new_penulis, new_bahasa, new_judul, new_deskripsi))
+          koneksi.commit()
 
-          new_objek = {
-               "id":ID,
-               "penulis":new_penulis,
-               "bahasa":new_bahasa,
-               "judul":new_judul,
-               "deskripsi":new_deskripsi
-          }
-
-          list_buku.append(new_objek)
-          return jsonify(list_buku), 201
+          return f"Buku dengan id : {kursor.lastrowid} berhasil dibuat", 201
 
 @aplikasi.route('/book/<int:id>', methods=["PUT","GET","DELETE"])
 def satu_buku(id):
+     koneksi = koneksi_php()
+     kursor = koneksi.cursor()
+     buku = None
+
      if request.method == "GET":
-          for buku in list_buku:
-               if buku['id'] == id:
-                    return jsonify(buku)
-          return "Buku tidak ditemukan", 404
+          kursor.execute("SELECT * FROM book WHERE id=?",(id,))
+          rows = kursor.fetchall()
+          for r in rows:
+               buku = r
+          if buku is not None:
+               return jsonify(buku), 200
+          else:
+               return "Ada yang salah", 404          
      elif request.method == "PUT":
           for buku in list_buku:
                if buku['id'] == id:
@@ -89,4 +109,4 @@ def satu_buku(id):
           return "Buku tidak ditemukan", 404
 
 if __name__ == "__main__":
-     aplikasi.run()
+     aplikasi.run(debug= True)
